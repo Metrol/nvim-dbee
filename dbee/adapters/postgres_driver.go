@@ -17,6 +17,7 @@ import (
 var (
 	_ core.Driver           = (*postgresDriver)(nil)
 	_ core.DatabaseSwitcher = (*postgresDriver)(nil)
+	_ core.ParameterDriver  = (*postgresDriver)(nil)
 )
 
 type postgresDriver struct {
@@ -33,6 +34,19 @@ func (c *postgresDriver) Query(ctx context.Context, query string) (core.ResultSt
 	}
 
 	return c.c.QueryUntilNotEmpty(ctx, query)
+}
+
+// QueryParams uses database/sql arguments, which pq sends with PostgreSQL Bind.
+func (c *postgresDriver) QueryParams(ctx context.Context, query string, args []any) (core.ResultStream, error) {
+	words := strings.Fields(query)
+	action := ""
+	if len(words) > 0 {
+		action = strings.ToLower(words[0])
+	}
+	if (action == "update" || action == "delete" || action == "insert") && !strings.Contains(strings.ToLower(query), "returning") {
+		return c.c.Exec(ctx, query, args...)
+	}
+	return c.c.Query(ctx, query, args...)
 }
 
 func (c *postgresDriver) Columns(opts *core.TableOptions) ([]*core.Column, error) {

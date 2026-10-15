@@ -101,6 +101,21 @@ func mountEndpoints(p *plugin.Plugin, h *handler.Handler) {
 			return handler.WrapCall(call), err
 		})
 
+	p.RegisterEndpoint("DbeeConnectionParameters", func(args *struct {
+		ID    core.ConnectionID `msgpack:",array"`
+		Query string
+	}) (any, error) {
+		return h.ConnectionParameters(args.ID, args.Query)
+	})
+	p.RegisterEndpoint("DbeeConnectionExecuteBound", func(args *struct {
+		ID     core.ConnectionID `msgpack:",array"`
+		Query  string
+		Values map[string]core.ParameterValue
+	}) (any, error) {
+		call, err := h.ConnectionExecuteBound(args.ID, args.Query, args.Values)
+		return handler.WrapCall(call), err
+	})
+
 	p.RegisterEndpoint(
 		"DbeeConnectionGetCalls",
 		func(args *struct {

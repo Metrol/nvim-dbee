@@ -170,6 +170,10 @@ func (h *Handler) ConnectionExecute(connID core.ConnectionID, query string) (*co
 		h.events.CallStateChanged(c)
 	})
 
+	return h.registerCall(connID, call), nil
+}
+
+func (h *Handler) registerCall(connID core.ConnectionID, call *core.Call) *core.Call {
 	id := call.GetID()
 
 	// add to lookup
@@ -179,7 +183,32 @@ func (h *Handler) ConnectionExecute(connID core.ConnectionID, query string) (*co
 	// update current call and conn
 	_ = h.SetCurrentConnection(connID)
 
-	return call, nil
+	return call
+}
+
+func (h *Handler) ConnectionParameters(connID core.ConnectionID, query string) ([]string, error) {
+	connection, ok := h.lookupConnection[connID]
+	if !ok {
+		return nil, fmt.Errorf("unknown connection with id: %q", connID)
+	}
+	return connection.ParameterNames(query)
+}
+
+func (h *Handler) ConnectionExecuteBound(connID core.ConnectionID, query string, values map[string]core.ParameterValue) (*core.Call, error) {
+	connection, ok := h.lookupConnection[connID]
+	if !ok {
+		return nil, fmt.Errorf("unknown connection with id: %q", connID)
+	}
+	call, err := connection.ExecuteBound(query, values, func(_ core.CallState, call *core.Call) {
+		if err := call.Err(); err != nil {
+			h.log.Errorf("bound query failed: %s", err)
+		}
+		h.events.CallStateChanged(call)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return h.registerCall(connID, call), nil
 }
 
 func (h *Handler) ConnectionGetCalls(connID core.ConnectionID) ([]*core.Call, error) {

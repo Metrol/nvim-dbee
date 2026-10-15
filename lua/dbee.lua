@@ -70,10 +70,10 @@ function dbee.execute(query)
     error("no connection currently selected")
   end
 
-  local call = api.core.connection_execute(conn.id, query)
-  api.ui.result_set_call(call)
-
-  dbee.open()
+  api.core.connection_run(conn.id, query, vim.api.nvim_get_current_buf(), function(call)
+    api.ui.result_set_call(call)
+    dbee.open()
+  end)
 end
 
 ---Store currently displayed result.

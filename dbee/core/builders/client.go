@@ -59,8 +59,8 @@ func (c *Client) ColumnsFromQuery(query string, args ...any) ([]*core.Column, er
 }
 
 // Exec executes a query and returns a stream with single row (number of affected results).
-func (c *Client) Exec(ctx context.Context, query string) (*ResultStream, error) {
-	res, err := c.db.ExecContext(ctx, query)
+func (c *Client) Exec(ctx context.Context, query string, args ...any) (*ResultStream, error) {
+	res, err := c.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,8 +79,8 @@ func (c *Client) Exec(ctx context.Context, query string) (*ResultStream, error) 
 }
 
 // Query executes a query on a connection and returns a result stream.
-func (c *Client) Query(ctx context.Context, query string) (*ResultStream, error) {
-	rows, err := c.db.QueryContext(ctx, query)
+func (c *Client) Query(ctx context.Context, query string, args ...any) (*ResultStream, error) {
+	rows, err := c.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

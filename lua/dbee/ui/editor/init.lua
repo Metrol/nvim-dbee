@@ -1,6 +1,7 @@
 local utils = require("dbee.utils")
 local common = require("dbee.ui.common")
 local welcome = require("dbee.ui.editor.welcome")
+local parameters = require("dbee.parameters")
 
 ---@alias namespace_id "global"|string
 
@@ -112,8 +113,9 @@ function EditorUI:get_actions()
       if not conn then
         return
       end
-      local call = self.handler:connection_execute(conn.id, query)
-      self.result:set_call(call)
+      parameters.run(self.handler, conn.id, query, bufnr, function(call)
+        self.result:set_call(call)
+      end)
     end,
     run_selection = function()
       local mode = vim.fn.mode()
@@ -135,8 +137,9 @@ function EditorUI:get_actions()
       if not conn then
         return
       end
-      local call = self.handler:connection_execute(conn.id, query)
-      self.result:set_call(call)
+      parameters.run(self.handler, conn.id, query, vim.api.nvim_get_current_buf(), function(call)
+        self.result:set_call(call)
+      end)
     end,
     run_under_cursor = function()
       local bufnr = vim.api.nvim_get_current_buf()
@@ -156,7 +159,9 @@ function EditorUI:get_actions()
         -- run the query
         local conn = self:connection_for_buffer(bufnr)
         if conn then
-          self.result:set_call(self.handler:connection_execute(conn.id, query))
+          parameters.run(self.handler, conn.id, query, bufnr, function(call)
+            self.result:set_call(call)
+          end)
         end
 
         -- remove highlighting after delay

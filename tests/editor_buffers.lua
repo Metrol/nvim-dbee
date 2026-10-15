@@ -10,6 +10,9 @@ local ok, err = xpcall(function()
   local Editor = require("dbee.ui.editor")
   local current, calls = "first", {}
   local handler = {
+    connection_parameters = function()
+      return {}
+    end,
     get_current_connection = function()
       return { id = current }
     end,

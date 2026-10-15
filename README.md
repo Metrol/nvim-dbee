@@ -305,6 +305,38 @@ Attached entries last for the editor session. The drawer's delete action only de
 rename action is disabled for project files. Detaching restores prior buffer mappings. Project files
 are never copied into DBee's scratchpad directory or deleted by DBee.
 
+### PostgreSQL Named Parameters
+
+Write the same named SQL you use in PHP:
+
+```sql
+SELECT r.* FROM "RFP" AS r WHERE r."eventID" = :eventID;
+```
+
+Running the query prompts for each distinct parameter. Enter raw values without SQL quotes;
+PostgreSQL infers their types from the query. Use explicit casts such as `:value::text` where needed.
+Enter accepts each value. Ctrl-N toggles SQL NULL, shown as `[NULL]` in the prompt title; an empty
+value without that flag is an empty string. Escape cancels the entire run without executing SQL.
+
+Every run prompts again, prefilled with values remembered for that buffer and connection during the
+current Neovim session. Repeated names share one value and prompt. Values are not written into the
+SQL buffer or saved in DBee's query history.
+
+The Go backend converts named markers to PostgreSQL `$1`, `$2`, etc. and sends values separately
+through the driver's native binding API. It skips quoted text, dollar quotes, comments and `::`
+casts. Named and positional markers cannot be mixed in one bound query. Binding is currently
+PostgreSQL-only; other database drivers continue to support queries without parameters.
+
+Parameterized execution accepts one statement at a time. Select the desired statement or use
+normal-mode Enter in DBee's editor pane. Files without parameters retain their existing batch
+behavior. Native `BB`, Enter, `:Dbee execute`, Lua `execute()`, and the configured project-buffer run
+shortcut all use the same prompting path.
+
+The low-level `api.core.connection_execute()` remains an unprompted raw execution API. Use
+`api.core.connection_run(id, query, bufnr, callback)` for prompts, or
+`api.core.connection_execute_bound(id, query, values)` to supply values directly. Each value is a
+table with `text` and `is_null` fields; bound calls retain the original named SQL in history.
+
 ### Navigating Result Columns
 
 In the results pane, normal-mode Left and Right jump to the previous or next data column on the
@@ -454,11 +486,23 @@ Run the project-buffer regression checks from the repository root:
 ```sh
 nvim --headless -u NONE -i NONE -l tests/editor_buffers.lua
 nvim --headless -u NONE -i NONE -l tests/result_columns.lua
+nvim --headless -u NONE -i NONE -l tests/parameters.lua
 ```
 
 The checks use temporary SQL files and a fake execution handler; no database server is needed.
 They require `nui.nvim`, using its lazy.nvim installation by default. Set `NUI_NVIM_PATH` to use a
-different installation. The Go backend does not need rebuilding for Lua-only changes.
+different installation. The Go backend does not need rebuilding for Lua-only changes. Native binding adds RPC endpoints,
+so rebuild and restart Neovim after updating it. Backend tests include `go test ./core/... ./handler/...`
+and the PostgreSQL binding tests in `./adapters` (use `CGO_ENABLED=0` to exclude DuckDB when needed).
+
+With this fork loaded in your Neovim configuration and a PostgreSQL connection available, run the
+read-only binding integration check against constant values:
+
+```sh
+DBEE_POSTGRES_TEST_URL='postgresql://user@host/database' nvim --headless -i NONE '+luafile tests/postgres_parameters.lua'
+```
+
+This check can use `.pgpass` and does not read application tables or modify database data.
 
 Reffer to [ARCHITECTURE.md](ARCHITECTURE.md) for a brief overview of the architecture.
 

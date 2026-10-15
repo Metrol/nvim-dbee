@@ -217,6 +217,19 @@ function Handler:connection_execute(id, query)
   return vim.fn.DbeeConnectionExecute(id, query)
 end
 
+---Discover named parameters without executing SQL.
+---@param id connection_id
+---@param query string
+---@return string[]
+function Handler:connection_parameters(id, query)
+  return vim.fn.DbeeConnectionParameters(id, query)
+end
+
+---Execute SQL with values bound separately by the database driver.
+function Handler:connection_execute_bound(id, query, values)
+  return vim.fn.DbeeConnectionExecuteBound(id, query, values)
+end
+
 ---@param id connection_id
 ---@return DBStructure[]
 function Handler:connection_get_structure(id)

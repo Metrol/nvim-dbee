@@ -121,6 +121,29 @@ function core.connection_execute(id, query)
   return state.handler():connection_execute(id, query)
 end
 
+---Discover parameters without executing SQL. Bound batches fail here.
+function core.connection_parameters(id, query)
+  return state.handler():connection_parameters(id, query)
+end
+
+---Execute original named SQL with separately supplied values.
+---@param id connection_id
+---@param query string
+---@param values table<string, { text: string, is_null: boolean }>
+---@return CallDetails
+function core.connection_execute_bound(id, query, values)
+  return state.handler():connection_execute_bound(id, query, values)
+end
+
+---Prompt for named parameters and execute using the captured buffer/connection.
+---@param id connection_id
+---@param query string
+---@param bufnr integer
+---@param callback fun(call: CallDetails)
+function core.connection_run(id, query, bufnr, callback)
+  require("dbee.parameters").run(state.handler(), id, query, bufnr, callback)
+end
+
 ---Get database structure of a connection.
 ---@param id connection_id
 ---@return DBStructure[]
