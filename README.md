@@ -282,6 +282,29 @@ Here are a few steps to quickly get started:
 - Once you are done or you want to go back to where you were, you can call
   `require("dbee").close()`.
 
+### Working with Project SQL Files
+
+The editor can display an existing SQL buffer alongside the schema browser and results, using the
+original buffer and project path:
+
+```lua
+local dbee = require("dbee")
+local buffer = vim.api.nvim_get_current_buf()
+local connection = dbee.api.core.get_current_connection()
+assert(connection, "Select a DBee connection first")
+dbee.api.ui.editor_attach_buffer(buffer, connection.id)
+dbee.open()
+```
+
+Attached files appear as `[file] path/to/query.sql` under the connection's local notes. They keep their
+unsaved edits and buffer options; `:write` saves the original project file. `BB` runs the buffer or
+visual selection, and normal-mode Enter runs the statement under the cursor. Selecting an attached
+file restores its assigned connection. Closing DBee restores the previous project window layout.
+
+Attached entries last for the editor session. The drawer's delete action only detaches them, and its
+rename action is disabled for project files. Detaching restores prior buffer mappings. Project files
+are never copied into DBee's scratchpad directory or deleted by DBee.
+
 ### Specifying Connections
 
 Connection represents an instance of the database client (i.e. one database). This is how it looks
@@ -417,6 +440,16 @@ require("dbee").api.ui.some_func()
 <!-- DOCGEN_IGNORE_START -->
 
 ## Development
+
+Run the project-buffer regression checks from the repository root:
+
+```sh
+nvim --headless -u NONE -i NONE -l tests/editor_buffers.lua
+```
+
+The checks use temporary SQL files and a fake execution handler; no database server is needed.
+They require `nui.nvim`, using its lazy.nvim installation by default. Set `NUI_NVIM_PATH` to use a
+different installation. The Go backend does not need rebuilding for Lua-only changes.
 
 Reffer to [ARCHITECTURE.md](ARCHITECTURE.md) for a brief overview of the architecture.
 

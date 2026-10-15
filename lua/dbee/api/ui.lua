@@ -62,6 +62,16 @@ function ui.editor_search_note_with_file(file)
   return state.editor():search_note_with_file(file)
 end
 
+---Attach and select an existing project SQL buffer in the editor pane.
+---Keeps its filename, contents, options and unsaved edits. The drawer's delete
+---action detaches external buffers without deleting project files.
+---@param bufnr integer
+---@param connection_id? string connection to use for this buffer
+---@return note_id
+function ui.editor_attach_buffer(bufnr, connection_id)
+  return state.editor():attach_buffer(bufnr, connection_id)
+end
+
 --- Creates a new note in namespace.
 --- Errors if id or name is nil or there is a note with the same
 --- name in namespace already.

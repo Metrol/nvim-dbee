@@ -105,6 +105,12 @@ function DrawerUI:new(handler, editor, result, opts)
     o:on_current_note_changed(data)
   end)
 
+  for _, event in ipairs { "note_created", "note_removed", "note_state_changed" } do
+    editor:register_event_listener(event, function()
+      o:refresh()
+    end)
+  end
+
   return o
 end
 

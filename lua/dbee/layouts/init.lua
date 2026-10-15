@@ -104,6 +104,13 @@ function layouts.Default:configure_window_on_switch(on_switch, winid, open_fn, i
   utils.create_singleton_autocmd({ "BufWinEnter", "BufReadPost", "BufNewFile" }, {
     window = winid,
     callback = function(event)
+      if is_editor then
+        local note = api_ui.editor_search_note_with_buf(event.buf)
+        if note then
+          api_ui.editor_set_current_note(note.id)
+          return
+        end
+      end
       action(winid, event.buf, event.file)
     end,
   })

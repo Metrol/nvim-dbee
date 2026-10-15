@@ -413,7 +413,7 @@ local function editor_namespace_nodes(editor, namespace, refresh)
         editor:set_current_note(note.id)
         cb()
       end,
-      action_2 = function(cb, _, input)
+      action_2 = not note.external and function(cb, _, input)
         input {
           title = "New Name",
           default = note.name,
@@ -425,10 +425,10 @@ local function editor_namespace_nodes(editor, namespace, refresh)
             cb()
           end,
         }
-      end,
+      end or nil,
       action_3 = function(cb, select)
         select {
-          title = "Confirm Deletion",
+          title = note.external and "Detach Project File" or "Confirm Deletion",
           items = { "Yes", "No" },
           on_confirm = function(selection)
             if selection == "Yes" then

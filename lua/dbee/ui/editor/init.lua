@@ -5,7 +5,7 @@ local welcome = require("dbee.ui.editor.welcome")
 ---@alias namespace_id "global"|string
 
 ---@alias note_id string
----@alias note_details { id: note_id, name: string, file: string, bufnr: integer? }
+---@alias note_details { id: note_id, name: string, file: string, bufnr: integer?, external: boolean?, connection_id: string?, external_mappings: table[]?, external_autocmds: integer[]? }
 
 ---@class EditorUI
 ---@field private handler Handler
@@ -104,14 +104,11 @@ end
 function EditorUI:get_actions()
   return {
     run_file = function()
-      if not self.winid or not vim.api.nvim_win_is_valid(self.winid) then
-        return
-      end
-      local bufnr = vim.api.nvim_win_get_buf(self.winid)
+      local bufnr = vim.api.nvim_get_current_buf()
       local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
       local query = table.concat(lines, "\n")
 
-      local conn = self.handler:get_current_connection()
+      local conn = self:connection_for_buffer(bufnr)
       if not conn then
         return
       end
@@ -119,12 +116,22 @@ function EditorUI:get_actions()
       self.result:set_call(call)
     end,
     run_selection = function()
-      local srow, scol, erow, ecol = utils.visual_selection()
-
-      local selection = vim.api.nvim_buf_get_text(0, srow, scol, erow, ecol, {})
+      local mode = vim.fn.mode()
+      local active = mode == "v" or mode == "V" or mode == "\022"
+      local selection = vim.fn.getregion(
+        vim.fn.getpos(active and "v" or "'<"),
+        vim.fn.getpos(active and "." or "'>"),
+        { type = active and mode or vim.fn.visualmode() }
+      )
+      if active then
+        vim.cmd.normal { args = { vim.api.nvim_replace_termcodes("<Esc>", true, false, true) }, bang = true }
+      end
       local query = table.concat(selection, "\n")
+      if not query:find("%S") then
+        return
+      end
 
-      local conn = self.handler:get_current_connection()
+      local conn = self:connection_for_buffer(vim.api.nvim_get_current_buf())
       if not conn then
         return
       end
@@ -147,7 +154,7 @@ function EditorUI:get_actions()
         })
 
         -- run the query
-        local conn = self.handler:get_current_connection()
+        local conn = self:connection_for_buffer(bufnr)
         if conn then
           self.result:set_call(self.handler:connection_execute(conn.id, query))
         end
@@ -159,6 +166,114 @@ function EditorUI:get_actions()
       end
     end,
   }
+end
+
+---Use an attached file's assigned connection even after browsing another one.
+---@private
+---@param bufnr integer
+function EditorUI:connection_for_buffer(bufnr)
+  local note = self:search_note_with_buf(bufnr)
+  if note and note.connection_id then
+    self.handler:set_current_connection(note.connection_id)
+  end
+  return self.handler:get_current_connection()
+end
+
+---Attach an existing SQL buffer without copying it or changing buffer options.
+---External files are session-only entries; removing one only detaches it.
+---@param bufnr integer
+---@param connection_id? string
+---@return note_id
+function EditorUI:attach_buffer(bufnr, connection_id)
+  if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then
+    error("invalid buffer to attach")
+  end
+  if vim.bo[bufnr].filetype ~= "sql" or vim.bo[bufnr].buftype ~= "" then
+    error("only regular SQL buffers can be attached")
+  end
+  local namespace = connection_id or "global"
+  local note, old_namespace = self:search_note_with_buf(bufnr)
+  if note and not note.external then
+    self:set_current_note(note.id)
+    return note.id
+  end
+  self:namespace_get_notes(namespace)
+  if note then
+    self.notes[old_namespace][note.id] = nil
+  else
+    note = { id = "buffer:" .. bufnr, bufnr = bufnr, external = true }
+    local mappings = {}
+    vim.api.nvim_buf_call(bufnr, function()
+      for _, km in ipairs(self.mappings or {}) do
+        local original = vim.fn.maparg(km.key, km.mode, false, true)
+        mappings[#mappings + 1] = {
+          key = km.key,
+          mode = km.mode,
+          original = original.buffer == 1 and original or nil,
+        }
+      end
+      common.configure_buffer_mappings(bufnr, self:get_actions(), self.mappings)
+      for _, mapping in ipairs(mappings) do
+        mapping.installed = vim.fn.maparg(mapping.key, mapping.mode, false, true)
+      end
+    end)
+    note.external_mappings = mappings
+    note.external_autocmds = {
+      vim.api.nvim_create_autocmd("BufWipeout", {
+        buffer = bufnr,
+        once = true,
+        callback = function()
+          vim.schedule(function()
+            local found, ns = self:search_note(note.id)
+            if found then
+              self:namespace_remove_note(ns, note.id)
+            end
+          end)
+        end,
+      }),
+      vim.api.nvim_create_autocmd("BufFilePost", {
+        buffer = bufnr,
+        callback = function()
+          note.file = vim.api.nvim_buf_get_name(bufnr)
+          note.name = "[file] " .. vim.fn.fnamemodify(note.file, ":~:.")
+          self:trigger_event("note_state_changed", { note = note })
+        end,
+      }),
+    }
+  end
+  note.connection_id = connection_id
+  note.file = vim.api.nvim_buf_get_name(bufnr)
+  note.name = note.file ~= "" and "[file] " .. vim.fn.fnamemodify(note.file, ":~:.") or "[buffer " .. bufnr .. "]"
+  self.notes[namespace][note.id] = note
+  self:trigger_event("note_state_changed", { note = note })
+  self:set_current_note(note.id)
+  return note.id
+end
+
+---@private
+---@param note note_details
+function EditorUI:detach_buffer(note)
+  for _, autocmd in ipairs(note.external_autocmds or {}) do
+    pcall(vim.api.nvim_del_autocmd, autocmd)
+  end
+  if note.bufnr and vim.api.nvim_buf_is_valid(note.bufnr) then
+    vim.api.nvim_buf_call(note.bufnr, function()
+      for _, mapping in ipairs(note.external_mappings or {}) do
+        local current = vim.fn.maparg(mapping.key, mapping.mode, false, true)
+        -- Don't overwrite a mapping the user changed after attachment.
+        if
+          current.buffer == 1
+          and current.callback == mapping.installed.callback
+          and current.rhs == mapping.installed.rhs
+        then
+          pcall(vim.keymap.del, mapping.mode, mapping.key, { buffer = note.bufnr })
+          if mapping.original then
+            vim.fn.mapset(mapping.mode, false, mapping.original)
+          end
+        end
+      end
+    end)
+  end
 end
 
 ---Triggers an in-built action.
@@ -348,12 +463,23 @@ function EditorUI:namespace_remove_note(id, note_id)
     error("invalid note id to remove")
   end
 
-  -- delete file
-  vim.fn.delete(note.file)
+  if note.external then
+    self:detach_buffer(note)
+  else
+    -- Only scratchpad files belong to DBee.
+    vim.fn.delete(note.file)
+  end
 
   -- delete record
   self.notes[namespace][note_id] = nil
 
+  if note.external and self.current_note_id == note_id then
+    self.current_note_id = nil
+    local replacement = self:namespace_get_notes("global")[1]
+    if replacement then
+      self:set_current_note(replacement.id)
+    end
+  end
   self:trigger_event("note_removed", { note_id = note_id })
 end
 
@@ -366,6 +492,9 @@ function EditorUI:note_rename(id, name)
   local note, namespace = self:search_note(id)
   if not note then
     error("invalid note id to rename")
+  end
+  if note.external then
+    error("rename project files from their project, not the DBee drawer")
   end
   if not name or name == "" then
     error("invalid name")
@@ -408,6 +537,10 @@ end
 -- and opens it in the window
 ---@param id note_id
 function EditorUI:set_current_note(id)
+  local selected = self:search_note(id)
+  if selected and selected.connection_id then
+    self.handler:set_current_connection(selected.connection_id)
+  end
   if id and self.current_note_id == id then
     self:display_note(id)
     return
@@ -441,6 +574,12 @@ function EditorUI:display_note(id)
   if note.bufnr and vim.api.nvim_buf_is_valid(note.bufnr) then
     vim.api.nvim_win_set_buf(self.winid, note.bufnr)
     vim.api.nvim_set_current_win(self.winid)
+    return
+  end
+
+  -- A wiped external buffer is detached by its lifecycle callback. Never
+  -- recreate a project file as a scratchpad or silently read it from disk.
+  if note.external then
     return
   end
 
