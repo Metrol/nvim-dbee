@@ -46,21 +46,24 @@ If you prefer to watch a video than to browse through docs, I made a video, whic
 
 ## Installation
 
-**requires nvim>=0.10**
+**requires nvim>=0.10 and Go>=1.27**
+
+For this fork, build from source with `install("go")`. The inherited download manifest points
+to upstream binaries, which do not include this fork's changes. The default native build also
+requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
 
 - packer.nvim:
 
   ```lua
   use {
-    "kndndrj/nvim-dbee",
+    "Metrol/nvim-dbee",
+    branch = "dev-setup",
     requires = {
       "MunifTanjim/nui.nvim",
     },
     run = function()
-      -- Install tries to automatically detect the install method.
-      -- if it fails, try calling it with one of these parameters:
-      --    "curl", "wget", "bitsadmin", "go"
-      require("dbee").install()
+      -- Build this fork; upstream release binaries lack its changes.
+      require("dbee").install("go")
     end,
     config = function()
       require("dbee").setup(--[[optional config]])
@@ -72,15 +75,14 @@ If you prefer to watch a video than to browse through docs, I made a video, whic
 
   ```lua
   {
-    "kndndrj/nvim-dbee",
+    "Metrol/nvim-dbee",
+    branch = "dev-setup",
     dependencies = {
       "MunifTanjim/nui.nvim",
     },
     build = function()
-      -- Install tries to automatically detect the install method.
-      -- if it fails, try calling it with one of these parameters:
-      --    "curl", "wget", "bitsadmin", "go"
-      require("dbee").install()
+      -- Build this fork; upstream release binaries lack its changes.
+      require("dbee").install("go")
     end,
     config = function()
       require("dbee").setup(--[[optional config]])
@@ -137,6 +139,7 @@ have a few options:
   [install manifest](lua/dbee/install/__manifest.lua)
 - `go install` (the install location will vary depending on your local go configuration):
   ```sh
+  # This command installs upstream DBee, not this fork:
   go install github.com/kndndrj/nvim-dbee/dbee@<version>
   ```
 - Clone and build
@@ -482,6 +485,17 @@ require("dbee").api.ui.some_func()
 <!-- DOCGEN_IGNORE_START -->
 
 ## Development
+
+Building this fork requires Go 1.27 or newer. Its BigQuery client is pinned to v1.85.0.
+Build the backend from this checkout rather than downloading an upstream release binary.
+
+```sh
+cd dbee
+go build -o ~/.local/share/nvim/dbee/bin/dbee .
+```
+
+The default build includes DuckDB on supported platforms and requires a C/C++ toolchain.
+Set `CGO_ENABLED=0` to omit DuckDB when only pure-Go drivers are needed.
 
 Run the project-buffer regression checks from the repository root:
 
