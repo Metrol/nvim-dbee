@@ -3,6 +3,7 @@ local progress = require("dbee.ui.result.progress")
 local common = require("dbee.ui.common")
 local columns = require("dbee.ui.result.columns")
 local Header = require("dbee.ui.result.header")
+local status = require("dbee.ui.result.status")
 
 -- ResultUI represents the part of ui with displayed results
 ---@class ResultUI
@@ -16,6 +17,7 @@ local Header = require("dbee.ui.result.header")
 ---@field private page_index integer index of the current page
 ---@field private page_ammount integer number of pages in the current result set
 ---@field private stop_progress fun() function that stops progress display
+---@field private result_status? { count: string, timing: string, query: string }
 ---@field private header? table manages the pinned header overlay
 ---@field private column_layout? { tick: integer, starts: integer[] }
 ---@field private progress_opts progress_config
@@ -69,6 +71,22 @@ function ResultUI:new(handler, opts)
   if opts.pin_headers ~= false then
     o.header = Header.new(o.bufnr)
   end
+
+  local status_group = vim.api.nvim_create_augroup("dbee-result-status-" .. o.bufnr, { clear = true })
+  vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
+    group = status_group,
+    callback = vim.schedule_wrap(function()
+      o:update_winbar()
+    end),
+  })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    group = status_group,
+    buffer = o.bufnr,
+    once = true,
+    callback = function()
+      vim.api.nvim_del_augroup_by_id(status_group)
+    end,
+  })
 
   handler:register_event_listener("call_state_changed", function(data)
     o:on_call_state_changed(data)
@@ -134,8 +152,21 @@ end
 
 ---@private
 function ResultUI:set_default_result_window()
+  self.result_status = nil
   if self:has_window() then
     vim.api.nvim_win_set_option(self.winid, "winbar", "Results")
+  end
+end
+
+---Refresh the query preview when results or available width change.
+---@private
+function ResultUI:update_winbar()
+  if self.result_status and self:has_window() and vim.api.nvim_win_get_buf(self.winid) == self.bufnr then
+    vim.api.nvim_win_set_option(
+      self.winid,
+      "winbar",
+      status.format(self.result_status, vim.api.nvim_win_get_width(self.winid))
+    )
   end
 end
 
@@ -220,14 +251,13 @@ function ResultUI:display_result(page)
   -- convert from microseconds to seconds
   local seconds = self.current_call.time_taken_us / 1000000
 
-  -- set winbar status
-  if self:has_window() then
-    vim.api.nvim_win_set_option(
-      self.winid,
-      "winbar",
-      string.format("%d/%d (%d)%%=Took %.3fs", page + 1, self.page_ammount + 1, length, seconds)
-    )
-  end
+  -- Keep the executed SQL with this result, independent of the editor buffer.
+  self.result_status = {
+    count = string.format("%d/%d (%d)", page + 1, self.page_ammount + 1, length),
+    timing = string.format("Took %.3fs", seconds),
+    query = self.current_call.query,
+  }
+  self:update_winbar()
   if self.header then
     self.header:refresh()
   end
@@ -322,6 +352,7 @@ end
 -- sets call's result to Result's buffer
 ---@param call CallDetails
 function ResultUI:set_call(call)
+  self:set_default_result_window()
   if self.header then
     self.header:clear()
   end

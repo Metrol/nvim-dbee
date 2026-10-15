@@ -57,7 +57,7 @@ requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
   ```lua
   use {
     "Metrol/nvim-dbee",
-    branch = "pincolumns",
+    branch = "dev-setup",
     requires = {
       "MunifTanjim/nui.nvim",
     },
@@ -76,7 +76,7 @@ requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
   ```lua
   {
     "Metrol/nvim-dbee",
-    branch = "pincolumns",
+    branch = "dev-setup",
     dependencies = {
       "MunifTanjim/nui.nvim",
     },
@@ -484,6 +484,13 @@ require("dbee").api.ui.some_func()
 
 <!-- DOCGEN_IGNORE_START -->
 
+## Result query preview
+
+The results status line shows a shortened preview of the SQL that produced the displayed result,
+beside its row count. Table dumps show their generated SQL. The preview updates when switching
+queries or pages and resizes to leave room for the count and timing. Editing the SQL buffer does
+not change the label of an existing result.
+
 ## Pinned result headers
 
 Column names stay visible while scrolling down through tabular results. The pinned header
@@ -509,6 +516,7 @@ Run the project-buffer regression checks from the repository root:
 ```sh
 nvim --headless -u NONE -i NONE -l tests/editor_buffers.lua
 nvim --headless -u NONE -i NONE -l tests/result_columns.lua
+nvim --headless -u NONE -i NONE -l tests/result_status.lua
 nvim --headless -u NONE -i NONE -l tests/result_headers.lua
 nvim --headless -u NONE -i NONE -l tests/result_header_events.lua
 nvim --headless -u NONE -i NONE -l tests/parameters.lua
