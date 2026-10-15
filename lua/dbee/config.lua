@@ -236,6 +236,9 @@ config.default = {
 
     -- mappings for the buffer
     mappings = {
+      -- Jump between columns in normal mode; preserve visual selection motions.
+      { key = "<Right>", mode = "n", action = "column_next" },
+      { key = "<Left>", mode = "n", action = "column_prev" },
       -- next/previous page
       { key = "L", mode = "", action = "page_next" },
       { key = "H", mode = "", action = "page_prev" },

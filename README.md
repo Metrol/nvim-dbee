@@ -305,6 +305,14 @@ Attached entries last for the editor session. The drawer's delete action only de
 rename action is disabled for project files. Detaching restores prior buffer mappings. Project files
 are never copied into DBee's scratchpad directory or deleted by DBee.
 
+### Navigating Result Columns
+
+In the results pane, normal-mode Left and Right jump to the previous or next data column on the
+current row. Counts such as `3<Right>` jump several columns. The window scrolls horizontally as needed,
+and movement stops at the first or last column. `h`/`l` and Visual-mode arrows keep their usual text
+selection behavior for copying values. These mappings can be customized through `result.mappings`
+using the `column_prev` and `column_next` actions.
+
 ### Specifying Connections
 
 Connection represents an instance of the database client (i.e. one database). This is how it looks
@@ -445,6 +453,7 @@ Run the project-buffer regression checks from the repository root:
 
 ```sh
 nvim --headless -u NONE -i NONE -l tests/editor_buffers.lua
+nvim --headless -u NONE -i NONE -l tests/result_columns.lua
 ```
 
 The checks use temporary SQL files and a fake execution handler; no database server is needed.

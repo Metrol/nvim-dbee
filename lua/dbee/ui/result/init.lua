@@ -1,6 +1,7 @@
 local utils = require("dbee.utils")
 local progress = require("dbee.ui.result.progress")
 local common = require("dbee.ui.common")
+local columns = require("dbee.ui.result.columns")
 
 -- ResultUI represents the part of ui with displayed results
 ---@class ResultUI
@@ -14,6 +15,7 @@ local common = require("dbee.ui.common")
 ---@field private page_index integer index of the current page
 ---@field private page_ammount integer number of pages in the current result set
 ---@field private stop_progress fun() function that stops progress display
+---@field private column_layout? { tick: integer, starts: integer[] }
 ---@field private progress_opts progress_config
 ---@field private window_options table<string, any> a table of window options.
 ---@field private buffer_options table<string, any> a table of buffer options.
@@ -224,10 +226,34 @@ function ResultUI:display_result(page)
   return page
 end
 
+---Move by rendered result columns, keeping the current row and selection keys.
+---@private
+---@param direction integer
+---@param count? integer
+function ResultUI:move_column(direction, count)
+  if not self:has_window() then
+    return
+  end
+  local tick = vim.api.nvim_buf_get_changedtick(self.bufnr)
+  if not self.column_layout or self.column_layout.tick ~= tick then
+    self.column_layout = {
+      tick = tick,
+      starts = columns.starts(vim.api.nvim_buf_get_lines(self.bufnr, 0, -1, false)),
+    }
+  end
+  columns.move(self.winid, self.column_layout.starts, direction, count)
+end
+
 ---@private
 ---@return table<string, fun()>
 function ResultUI:get_actions()
   return {
+    column_next = function()
+      self:move_column(1, vim.v.count1)
+    end,
+    column_prev = function()
+      self:move_column(-1, vim.v.count1)
+    end,
     page_next = function()
       self:page_next()
     end,
