@@ -57,7 +57,7 @@ requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
   ```lua
   use {
     "Metrol/nvim-dbee",
-    branch = "dev-setup",
+    branch = "pincolumns",
     requires = {
       "MunifTanjim/nui.nvim",
     },
@@ -76,7 +76,7 @@ requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
   ```lua
   {
     "Metrol/nvim-dbee",
-    branch = "dev-setup",
+    branch = "pincolumns",
     dependencies = {
       "MunifTanjim/nui.nvim",
     },
@@ -484,6 +484,13 @@ require("dbee").api.ui.some_func()
 
 <!-- DOCGEN_IGNORE_START -->
 
+## Pinned result headers
+
+Column names stay visible while scrolling down through tabular results. The pinned header
+follows horizontal scrolling and column jumps, while result text and copying remain unchanged.
+It disappears when the original header is visible, and clears on new queries, errors, or closing
+the results pane. Disable it with `result = { pin_headers = false }` in `setup()`.
+
 ## Development
 
 Building this fork requires Go 1.27 or newer. Its BigQuery client is pinned to v1.85.0.
@@ -502,6 +509,8 @@ Run the project-buffer regression checks from the repository root:
 ```sh
 nvim --headless -u NONE -i NONE -l tests/editor_buffers.lua
 nvim --headless -u NONE -i NONE -l tests/result_columns.lua
+nvim --headless -u NONE -i NONE -l tests/result_headers.lua
+nvim --headless -u NONE -i NONE -l tests/result_header_events.lua
 nvim --headless -u NONE -i NONE -l tests/parameters.lua
 nvim --headless -u NONE -i NONE -l tests/parameter_prompt.lua
 ```

@@ -25,7 +25,7 @@ local config = {}
 ---@divider -
 
 ---Configuration for result UI tile.
----@alias result_config { focus_result: boolean, mappings: key_mapping[], page_size: integer, progress: progress_config, window_options: table<string, any>, buffer_options: table<string, any> }
+---@alias result_config { pin_headers: boolean, focus_result: boolean, mappings: key_mapping[], page_size: integer, progress: progress_config, window_options: table<string, any>, buffer_options: table<string, any> }
 
 ---Configuration for editor UI tile.
 ---@alias editor_config { directory: string, mappings: key_mapping[], window_options: table<string, any>, buffer_options: table<string, any> }
@@ -216,6 +216,8 @@ config.default = {
 
   -- results window config
   result = {
+    -- Keep column names visible when scrolling results vertically.
+    pin_headers = true,
     -- see drawer comment.
     window_options = {},
     buffer_options = {},
@@ -356,6 +358,7 @@ function config.validate(cfg)
     drawer_disable_help = { cfg.drawer.disable_help, "boolean" },
     drawer_candies = { cfg.drawer.candies, "table" },
     drawer_mappings = { cfg.drawer.mappings, "table" },
+    result_pin_headers = { cfg.result.pin_headers, "boolean" },
     result_page_size = { cfg.result.page_size, "number" },
     result_progress = { cfg.result.progress, "table" },
     result_mappings = { cfg.result.mappings, "table" },

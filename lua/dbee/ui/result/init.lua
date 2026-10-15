@@ -2,6 +2,7 @@ local utils = require("dbee.utils")
 local progress = require("dbee.ui.result.progress")
 local common = require("dbee.ui.common")
 local columns = require("dbee.ui.result.columns")
+local Header = require("dbee.ui.result.header")
 
 -- ResultUI represents the part of ui with displayed results
 ---@class ResultUI
@@ -15,6 +16,7 @@ local columns = require("dbee.ui.result.columns")
 ---@field private page_index integer index of the current page
 ---@field private page_ammount integer number of pages in the current result set
 ---@field private stop_progress fun() function that stops progress display
+---@field private header? table manages the pinned header overlay
 ---@field private column_layout? { tick: integer, starts: integer[] }
 ---@field private progress_opts progress_config
 ---@field private window_options table<string, any> a table of window options.
@@ -64,6 +66,9 @@ function ResultUI:new(handler, opts)
   -- create a buffer for drawer and configure it
   o.bufnr = common.create_blank_buffer("dbee-result", o.buffer_options)
   common.configure_buffer_mappings(o.bufnr, o:get_actions(), opts.mappings)
+  if opts.pin_headers ~= false then
+    o.header = Header.new(o.bufnr)
+  end
 
   handler:register_event_listener("call_state_changed", function(data)
     o:on_call_state_changed(data)
@@ -136,11 +141,17 @@ end
 
 ---@private
 function ResultUI:display_progress()
+  if self.header then
+    self.header:clear()
+  end
   self.stop_progress = progress.display(self.bufnr, self.progress_opts)
 end
 
 ---@private
 function ResultUI:display_status()
+  if self.header then
+    self.header:clear()
+  end
   if not self.current_call then
     error("no call set to result")
   end
@@ -216,6 +227,9 @@ function ResultUI:display_result(page)
       "winbar",
       string.format("%d/%d (%d)%%=Took %.3fs", page + 1, self.page_ammount + 1, length, seconds)
     )
+  end
+  if self.header then
+    self.header:refresh()
   end
   -- set focus if window exists
   self:focus_result_window()
@@ -308,6 +322,9 @@ end
 -- sets call's result to Result's buffer
 ---@param call CallDetails
 function ResultUI:set_call(call)
+  if self.header then
+    self.header:clear()
+  end
   self.page_index = 0
   self.page_ammount = 0
   self.current_call = call
@@ -477,6 +494,9 @@ end
 ---@param winid integer
 function ResultUI:show(winid)
   self.winid = winid
+  if self.header then
+    self.header:set_window(winid)
+  end
 
   -- configure window highlights
   self:apply_highlight(self.winid)

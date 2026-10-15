@@ -307,6 +307,8 @@ Here are the defaults:
     
       -- results window config
       result = {
+        -- Keep column names visible when scrolling results vertically.
+        pin_headers = true,
         -- see drawer comment.
         window_options = {},
         buffer_options = {},
