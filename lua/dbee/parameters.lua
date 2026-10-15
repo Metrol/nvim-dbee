@@ -7,62 +7,195 @@ vim.api.nvim_create_autocmd("BufWipeout", {
   end,
 })
 
----Prompt once for each distinct name, retaining explicit NULL independently.
+---Show all distinct parameters in one editable form.
 function M.prompt(names, defaults, callback)
-  local Input = require("nui.input")
-  local values = {}
-  local function next_value(index)
-    local name = names[index]
-    if not name then
-      callback(values)
+  if #names == 0 then
+    callback {}
+    return
+  end
+  local Popup = require("nui.popup")
+  local values, lines = {}, {}
+  for index, name in ipairs(names) do
+    values[name] = vim.deepcopy(defaults[name] or { text = "", is_null = false })
+    -- Existing multiline values remain exact until this field is edited.
+    lines[index] = values[name].text:gsub("\n", "↵"):gsub("\r", "␍")
+  end
+  local origin = vim.api.nvim_get_current_win()
+  local popup = Popup {
+    relative = "editor",
+    position = "50%",
+    size = {
+      width = math.max(20, math.min(100, vim.o.columns - 6)),
+      height = math.min(#names, math.max(1, vim.o.lines - 8)),
+    },
+    enter = true,
+    border = {
+      style = "rounded",
+      text = {
+        top = " Parameters | Ctrl-Enter/Ctrl-S: Run | Esc: cancel ",
+        top_align = "center",
+        bottom = " Tab/Enter: next | Shift-Tab: back | Ctrl-N: NULL ",
+      },
+    },
+    buf_options = { buftype = "nofile", swapfile = false, filetype = "dbee-parameters" },
+    win_options = { wrap = false, number = false, relativenumber = false, cursorline = true, signcolumn = "no" },
+  }
+  local namespace = vim.api.nvim_create_namespace("dbee-parameter-form")
+  local closed, restoring = false, false
+  local function render()
+    vim.api.nvim_buf_clear_namespace(popup.bufnr, namespace, 0, -1)
+    for index, name in ipairs(names) do
+      vim.api.nvim_buf_set_extmark(popup.bufnr, namespace, index - 1, 0, {
+        virt_text = { { ":" .. name .. (values[name].is_null and " [NULL]" or "") .. " = ", "Title" } },
+        virt_text_pos = "inline",
+        right_gravity = false,
+      })
+    end
+  end
+  local function sync()
+    local current = vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false)
+    if #current ~= #names then
+      return false
+    end
+    for index, name in ipairs(names) do
+      if current[index] ~= lines[index] then
+        values[name] = { text = current[index], is_null = false }
+      end
+    end
+    lines = current
+    render()
+    return true
+  end
+  local function finish(submit)
+    if closed then
       return
     end
-    local previous = defaults[name] or { text = "", is_null = false }
-    local is_null = previous.is_null
-    local initial = previous.text
-    local input
-    local function title()
-      return string.format(
-        " :%s (%d/%d)%s | Ctrl-N: NULL | Esc: cancel ",
-        name,
-        index,
-        #names,
-        is_null and " [NULL]" or ""
+    if submit and not sync() then
+      vim.notify(
+        "Use one line per parameter; multiline pastes cannot add fields.",
+        vim.log.levels.WARN,
+        { title = "DBee parameters" }
       )
+      return
     end
-    input = Input({
-      position = "50%",
-      size = { width = math.max(20, math.min(85, vim.o.columns - 6)) },
-      border = { style = "rounded", text = { top = title(), top_align = "center" } },
-    }, {
-      prompt = ":" .. name .. " = ",
-      default_value = initial,
-      on_change = function(value)
-        if value ~= initial and is_null then
-          is_null = false
-          input.border:set_text("top", title(), "center")
-        end
-      end,
-      on_submit = function(value)
-        values[name] = { text = value, is_null = is_null }
-        next_value(index + 1)
-      end,
-      on_close = function()
-        callback(nil)
-      end,
-    })
-    for _, mode in ipairs { "i", "n" } do
-      input:map(mode, "<Esc>", function()
-        input:unmount()
-      end, { noremap = true })
-      input:map(mode, "<C-n>", function()
-        is_null = not is_null
-        input.border:set_text("top", title(), "center")
-      end, { noremap = true })
+    closed = true
+    vim.cmd("stopinsert")
+    popup:unmount()
+    if vim.api.nvim_win_is_valid(origin) then
+      vim.api.nvim_set_current_win(origin)
     end
-    input:mount()
+    vim.schedule(function()
+      callback(submit and values or nil)
+    end)
   end
-  next_value(1)
+  local function focus(index)
+    if closed or not popup.winid or not vim.api.nvim_win_is_valid(popup.winid) then
+      return
+    end
+    index = (index - 1) % #names + 1
+    vim.api.nvim_set_current_win(popup.winid)
+    vim.api.nvim_win_set_cursor(popup.winid, { index, #lines[index] })
+    -- Start after focus and any prior mode transition have completed.
+    vim.schedule(function()
+      if not closed and vim.api.nvim_get_current_win() == popup.winid then
+        vim.cmd("startinsert!")
+      end
+    end)
+  end
+  local function move(delta)
+    if sync() then
+      focus(vim.api.nvim_win_get_cursor(popup.winid)[1] + delta)
+    end
+  end
+  vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
+  render()
+  vim.api.nvim_buf_attach(popup.bufnr, false, {
+    on_lines = function()
+      if closed or restoring then
+        return
+      end
+      if not sync() then
+        restoring = true
+        vim.schedule(function()
+          if not closed and vim.api.nvim_buf_is_valid(popup.bufnr) then
+            vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
+            render()
+            vim.notify(
+              "Use one line per parameter; multiline paste was cancelled.",
+              vim.log.levels.WARN,
+              { title = "DBee parameters" }
+            )
+          end
+          restoring = false
+        end)
+      end
+    end,
+  })
+  for _, mode in ipairs { "i", "n" } do
+    popup:map(mode, "<Tab>", function()
+      move(1)
+    end, { noremap = true })
+    popup:map(mode, "<S-Tab>", function()
+      move(-1)
+    end, { noremap = true })
+    popup:map(mode, "<CR>", function()
+      move(1)
+    end, { noremap = true })
+    popup:map(mode, "<C-n>", function()
+      if not sync() then
+        return
+      end
+      local name = names[vim.api.nvim_win_get_cursor(popup.winid)[1]]
+      values[name].is_null = not values[name].is_null
+      render()
+    end, { noremap = true })
+    popup:map(mode, "<C-s>", function()
+      finish(true)
+    end, { noremap = true })
+    popup:map(mode, "<C-CR>", function()
+      finish(true)
+    end, { noremap = true })
+    popup:map(mode, "<Esc>", function()
+      finish(false)
+    end, { noremap = true })
+    popup:map(mode, "<C-c>", function()
+      finish(false)
+    end, { noremap = true })
+  end
+  -- Backspace/Delete must not join neighboring fields.
+  popup:map("i", "<BS>", function()
+    return vim.fn.col(".") > 1 and vim.api.nvim_replace_termcodes("<BS>", true, false, true) or ""
+  end, { expr = true, noremap = true })
+  popup:map("i", "<Del>", function()
+    return vim.fn.col(".") <= #vim.api.nvim_get_current_line()
+        and vim.api.nvim_replace_termcodes("<Del>", true, false, true)
+      or ""
+  end, { expr = true, noremap = true })
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    buffer = popup.bufnr,
+    once = true,
+    callback = function()
+      if not closed then
+        closed = true
+        vim.schedule(function()
+          vim.cmd("stopinsert")
+          popup:unmount()
+          callback(nil)
+        end)
+      end
+    end,
+  })
+  popup:mount()
+  vim.api.nvim_create_autocmd("WinClosed", {
+    pattern = tostring(popup.winid),
+    once = true,
+    callback = function()
+      vim.schedule(function()
+        finish(false)
+      end)
+    end,
+  })
+  focus(1)
 end
 
 ---Run unparameterized SQL unchanged; bind named values through the Go backend.

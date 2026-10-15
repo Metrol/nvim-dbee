@@ -313,10 +313,12 @@ Write the same named SQL you use in PHP:
 SELECT r.* FROM "RFP" AS r WHERE r."eventID" = :eventID;
 ```
 
-Running the query prompts for each distinct parameter. Enter raw values without SQL quotes;
+Running the query opens one form showing every distinct parameter. Enter raw values without SQL quotes;
 PostgreSQL infers their types from the query. Use explicit casts such as `:value::text` where needed.
-Enter accepts each value. Ctrl-N toggles SQL NULL, shown as `[NULL]` in the prompt title; an empty
-value without that flag is an empty string. Escape cancels the entire run without executing SQL.
+Tab or Enter moves to the next field; Shift-Tab moves back. Every focused field starts in Insert
+mode. Ctrl-N toggles SQL NULL for the current field, shown as `[NULL]` beside its name; an empty
+value without that flag is an empty string. Ctrl-Enter or Ctrl-S runs the query with all values.
+Escape cancels the entire run without executing SQL. Fields accept single-line input.
 
 Every run prompts again, prefilled with values remembered for that buffer and connection during the
 current Neovim session. Repeated names share one value and prompt. Values are not written into the
@@ -487,6 +489,7 @@ Run the project-buffer regression checks from the repository root:
 nvim --headless -u NONE -i NONE -l tests/editor_buffers.lua
 nvim --headless -u NONE -i NONE -l tests/result_columns.lua
 nvim --headless -u NONE -i NONE -l tests/parameters.lua
+nvim --headless -u NONE -i NONE -l tests/parameter_prompt.lua
 ```
 
 The checks use temporary SQL files and a fake execution handler; no database server is needed.
