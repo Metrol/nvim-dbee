@@ -7,11 +7,15 @@
 ![Backend](https://img.shields.io/badge/go-backend-lightblue?style=for-the-badge&logo=go&logoColor=white)
 ![Frontend](https://img.shields.io/badge/lua-frontend-blue?style=for-the-badge&logo=lua&logoColor=white)
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png)](https://www.buymeacoffee.com/kndndrj)
+[Original DBee project by kndndrj](https://github.com/kndndrj/nvim-dbee)
 
 <!-- DOCGEN_IGNORE_END -->
 
-# Neovim DBee
+# Neovim DBee — Metrol fork
+
+> **This is a fork of [kndndrj/nvim-dbee](https://github.com/kndndrj/nvim-dbee), not the original project.**
+> The enhancements in this fork were developed with assistance from OpenAI Codex.
+> Credit for the original DBee belongs to its authors and contributors.
 
 **Database Client for NeoVim!**
 
