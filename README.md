@@ -46,24 +46,25 @@ If you prefer to watch a video than to browse through docs, I made a video, whic
 
 ## Installation
 
-**requires nvim>=0.10 and Go>=1.27**
+**requires nvim>=0.10**
 
-For this fork, build from source with `install("go")`. The inherited download manifest points
-to upstream binaries, which do not include this fork's changes. The default native build also
-requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
+Linux x86-64 releases include a prebuilt backend with DuckDB. Installation requires curl (or wget),
+tar, and sha256sum, but no Go compiler or development checkout. The installer verifies the release
+checksum before atomically replacing the backend; failures leave the existing binary intact.
+Other platforms currently require an explicit source build with Go 1.27+ and a C/C++ toolchain.
 
 - packer.nvim:
 
   ```lua
   use {
     "Metrol/nvim-dbee",
-    branch = "dev-setup",
+    tag = "v0.2.0-metrol.1",
     requires = {
       "MunifTanjim/nui.nvim",
     },
     run = function()
-      -- Build this fork; upstream release binaries lack its changes.
-      require("dbee").install("go")
+      -- Download the matching backend release; no local compilation.
+      require("dbee").install()
     end,
     config = function()
       require("dbee").setup(--[[optional config]])
@@ -76,13 +77,13 @@ requires a C/C++ toolchain; disable CGO to omit DuckDB if needed.
   ```lua
   {
     "Metrol/nvim-dbee",
-    branch = "dev-setup",
+    tag = "v0.2.0-metrol.1",
     dependencies = {
       "MunifTanjim/nui.nvim",
     },
     build = function()
-      -- Build this fork; upstream release binaries lack its changes.
-      require("dbee").install("go")
+      -- Download the matching backend release; no local compilation.
+      require("dbee").install()
     end,
     config = function()
       require("dbee").setup(--[[optional config]])
@@ -104,15 +105,10 @@ implementations are detached from the main logic and they register themselves to
 plugin start. This allows the use of build constraints, which we use to exclued certain client
 implementations on certain platforms.
 
-The CI pipeline tries building the binary for GOARCH/GOOS combinations specified in
-[targets.json](ci/targets.json) - if the builds succeed, they are stored in a
-[remote bucket](https://github.com/kndndrj/nvim-dbee-bucket) on a separate branch per run.
-Additionally, the [install manifest](lua/dbee/install/__manifest.lua) gets created.
-
-To increase cgo cross-platform support, the pipeline uses zig as a C compiler.
-
-To check if your platform is currently supported, check out the mentioned manifest and the targets
-file.
+This fork currently publishes Linux x86-64 binaries from Ubuntu 22.04, including DuckDB.
+They run on modern glibc-based Linux distributions such as Omarchy. Other operating systems,
+CPU architectures, and musl-based distributions require a source build. The exact available
+binary and release are listed in the [install manifest](lua/dbee/install/__manifest.lua).
 
 <!-- DOCGEN_IGNORE_START -->
 
@@ -500,7 +496,7 @@ the results pane. Disable it with `result = { pin_headers = false }` in `setup()
 
 ## Development
 
-Building this fork requires Go 1.27 or newer. Its BigQuery client is pinned to v1.85.0.
+Building this fork **from source** requires Go 1.27 or newer. Its BigQuery client is pinned to v1.85.0.
 Build the backend from this checkout rather than downloading an upstream release binary.
 
 ```sh
@@ -550,3 +546,11 @@ You are also welcome to join the [#nvim-dbee:matrix.org](https://matrix.to/#/#nv
 chat for more direct communication.
 
 <!-- DOCGEN_IGNORE_END -->
+
+### Publishing a fork release
+
+Update the release tag in `lua/dbee/install/__manifest.lua` and the install examples, commit,
+and push a tag such as `v0.2.0-metrol.2`. The release workflow tests and compiles the backend on
+Ubuntu 22.04, verifies its RPC manifest, and publishes the archive plus `SHA256SUMS` to the matching
+GitHub release. Tags stay fixed; the workflow does not rewrite tags or commit generated manifests.
+Update the tag in your Neovim plugin specification when adopting a new release.

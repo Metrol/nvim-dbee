@@ -252,6 +252,9 @@ end
 
 ---@param command? install_command preffered command
 function M.exec(command)
+  if not command or command == "curl" or command == "wget" then
+    return require("dbee.install.prebuilt").install(command)
+  end
   -- find a suitable install command
   local jobs = get_job(command)
 
